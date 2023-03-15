@@ -1,0 +1,284 @@
+package in.co.balkishan.springbootstrap.security;
+
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
+
+import in.co.balkishan.springbootstrap.model.ErrorDetail;
+
+public class JwtAccessDeniedHandler implements AccessDeniedHandler {
+
+  @Override
+  public void handle(HttpServletRequest request, HttpServletResponse response,
+      AccessDeniedException accessDeniedException) throws IOException, ServletException {
+    ErrorDetail errorDetail = new ErrorDetail();
+    errorDetail.setMessage("JwtAccessDeniedHandler Token");
+    response.setStatus(HttpStatus.UNAUTHORIZED.value());
+    response.setContentType("application/json");
+    response.getOutputStream().println("asdasdadasds");
+
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
+package in.co.balkishan.springbootstrap.security;
+
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
+
+import in.co.balkishan.springbootstrap.model.ErrorDetail;
+
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+
+  @Override
+  public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
+      throws IOException, ServletException {
+    if (response.getContentType() != null)
+      return;
+    String errorMessage = "Auth Error";
+    String errorCode = "E401002";
+    String exceptionClassName = authException.getClass().getName();
+    String exceptionName = exceptionClassName.substring(exceptionClassName.lastIndexOf(".") + 1);
+    switch (exceptionName) {
+      case "InsufficientAuthenticationException": {
+        errorMessage = "Missing Valid Login Information";
+        errorCode = "E401010";
+      }
+        break;
+      case "UsernameNotFoundException": {
+        errorMessage = "User Not Found";
+        errorCode = "E401011";
+      }
+        break;
+      case "BadCredentialsException": {
+        errorMessage = "Invalid Credentials";
+        errorCode = "E401012";
+      }
+        break;
+    }
+    ErrorDetail errorDetail = new ErrorDetail();
+    errorDetail.setCode(errorCode);
+    errorDetail.setMessage(errorMessage);
+    response.setStatus(HttpStatus.UNAUTHORIZED.value());
+    response.setContentType("application/json");
+    response.getOutputStream().println("ERR");
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
+package in.co.balkishan.springbootstrap.security;
+
+import java.io.IOException;
+
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.filter.GenericFilterBean;
+
+public class JwtAuthFilter extends GenericFilterBean {
+  private JwtTokenProvider jwtTokenProvider;
+
+  public JwtAuthFilter(JwtTokenProvider jwtTokenProvider) {
+    this.jwtTokenProvider = jwtTokenProvider;
+  }
+
+  @Override
+  public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+      throws IOException, ServletException {
+    try {
+      String token = jwtTokenProvider.resolveToken((HttpServletRequest) request);
+      if (token != null && !token.isBlank() && !token.isEmpty() && jwtTokenProvider.validateToken(token)) {
+        Authentication auth = jwtTokenProvider.getAuthentication(token);
+        if (auth != null) {
+          SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+      }
+    } catch (Exception exception) {
+      String exceptionClassName = exception.getClass().getName();
+      String exceptionName = exceptionClassName.substring(exceptionClassName.lastIndexOf(".") + 1);
+
+      System.out.println("Exception : " + exception.getMessage());
+      switch (exceptionName) {
+        case "ExpiredJwtException": {
+          ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+          break;
+        case "SignatureException": {
+          ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+          break;
+        case "MalformedJwtException": {
+          ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+          break;
+        case "IllegalArgumentException": {
+          ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+          break;
+        case "JwtException": {
+          ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        }
+          break;
+      }
+      response.getOutputStream().println("EXCEPTION");
+
+    }
+
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
+package in.co.balkishan.springbootstrap.security;
+
+import org.springframework.security.config.annotation.SecurityConfigurerAdapter;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.DefaultSecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+public class JwtSecurityConfig extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
+
+  private JwtTokenProvider jwtTokenProvider;
+
+  public JwtSecurityConfig(JwtTokenProvider jwtTokenProvider) {
+    this.jwtTokenProvider = jwtTokenProvider;
+  }
+
+  @Override
+  public void configure(HttpSecurity builder) throws Exception {
+
+    super.configure(builder);
+    JwtAuthFilter customFilter = new JwtAuthFilter(jwtTokenProvider);
+    builder.addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class);
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
+package in.co.balkishan.springbootstrap.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+// import in.co.balkishan.springbootstrap.security.JwtAccessDeniedHandler;
+// import in.co.balkishan.springbootstrap.security.JwtAuthenticationEntryPoint;
+import in.co.balkishan.springbootstrap.security.JwtRequestFilter;
+// import in.co.balkishan.springbootstrap.security.JwtSecurityConfig;
+import in.co.balkishan.springbootstrap.security.JwtTokenProvider;
+
+@Configuration
+@EnableWebSecurity
+public class WebSecurityConfig {
+
+  @Autowired
+  JwtTokenProvider jwtTokenProvider;
+
+  @Autowired
+  JwtRequestFilter jwtRequestFilter;
+
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public AuthenticationManager authenticationManager(
+      final AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    return authenticationConfiguration.getAuthenticationManager();
+  }
+
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    // //@formatter:off
+    // http.httpBasic().disable().csrf().disable().cors()
+    //   .and()
+    //     .csrf().disable()
+    //     .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+    //   .and()
+    //     .exceptionHandling()
+    //     .accessDeniedHandler(new JwtAccessDeniedHandler())
+    //     .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
+    //   .and()
+    //     .authorizeRequests()
+    //     .antMatchers("/auth/**", "/.well-known/**", "/ping/**").permitAll()
+    //     .anyRequest().authenticated()
+    //   .and()
+    //     .apply(new JwtSecurityConfig(jwtTokenProvider));
+    // //@formatter:on
+    return http.cors()
+        .and()
+        .csrf().disable()
+        .authorizeRequests().antMatchers("/auth").permitAll()
+        .and()
+        .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        .and()
+        .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+        .build();
+    // return http.build();
+
+  }
+
+}

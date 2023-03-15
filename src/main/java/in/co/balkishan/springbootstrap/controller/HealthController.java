@@ -18,7 +18,7 @@ public class HealthController {
   @GetMapping("/ping")
   public ResponseEntity<PingResponse> ping() {
     PingResponse pingResponse = new PingResponse();
-    pingResponse.setMessage("Server is UP!");
+    pingResponse.setMessage("HealthController is UP!");
     pingResponse.setTimeStamp(LocalDateTime.now(ZoneOffset.UTC));
     return new ResponseEntity<>(pingResponse, HttpStatus.OK);
   }

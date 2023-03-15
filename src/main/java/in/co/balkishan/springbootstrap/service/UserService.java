@@ -3,6 +3,9 @@ package in.co.balkishan.springbootstrap.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import in.co.balkishan.springbootstrap.exception.NotFoundException;
@@ -10,7 +13,7 @@ import in.co.balkishan.springbootstrap.model.User;
 import in.co.balkishan.springbootstrap.repository.UserRepository;
 
 @Service
-public class UserService {
+public class UserService implements UserDetailsService {
   private final UserRepository userRepository;
 
   @Autowired
@@ -29,6 +32,13 @@ public class UserService {
   public User getUser(Integer userId) {
     return userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException("User not found", "E004001"));
+  }
+
+  @Override
+  public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+    return userRepository.findByEmail(
+        email).orElseThrow(
+            () -> new UsernameNotFoundException("User not found"));
   }
 
 }

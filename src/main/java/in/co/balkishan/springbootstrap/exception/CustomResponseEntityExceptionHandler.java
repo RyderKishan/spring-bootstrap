@@ -2,6 +2,7 @@ package in.co.balkishan.springbootstrap.exception;
 
 import in.co.balkishan.springbootstrap.model.ErrorDetail;
 
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -58,6 +59,21 @@ public class CustomResponseEntityExceptionHandler extends ResponseEntityExceptio
     errorDetail.setUrl(webRequest.getDescription(false));
     errorDetail.setSessionId(webRequest.getSessionId());
     errorDetail.setErrors(errors);
+
+    return new ResponseEntity<>(errorDetail, HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  @ExceptionHandler(SQLIntegrityConstraintViolationException.class)
+  public final ResponseEntity<ErrorDetail> handleSQLIntegrityConstraintViolationException(
+      SQLIntegrityConstraintViolationException exception, WebRequest webRequest) {
+    ErrorDetail errorDetail = new ErrorDetail();
+    errorDetail.setCode("E002001");
+    errorDetail.setMessage("SQLIntegrityConstraintViolationException");
+    errorDetail.setException(exception.getClass().getName());
+    errorDetail.setDescription(exception.getMessage());
+    errorDetail.setUrl(webRequest.getDescription(false));
+    errorDetail.setSessionId(webRequest.getSessionId());
+    errorDetail.setErrors(null);
 
     return new ResponseEntity<>(errorDetail, HttpStatus.INTERNAL_SERVER_ERROR);
   }
